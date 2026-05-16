@@ -3,7 +3,7 @@
     <TargetFramework>net472</TargetFramework>
     <AssemblyName>FactionColors</AssemblyName>
     <Description>Nuclear Option mod - shows third-faction units in their own faction color instead of generic enemy red</Description>
-    <Version>1.0.0</Version>
+    <Version>1.0.1</Version>
     <LangVersion>latest</LangVersion>
   </PropertyGroup>
 

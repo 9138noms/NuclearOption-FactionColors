@@ -9,7 +9,7 @@ using UnityEngine;
 
 namespace FactionColors
 {
-    [BepInPlugin("com.noms.factioncolors", "Faction Colors", "1.0.0")]
+    [BepInPlugin("com.noms.factioncolors", "Faction Colors", "1.0.1")]
     public class Plugin : BaseUnityPlugin
     {
         internal static ManualLogSource Log;
@@ -17,6 +17,12 @@ namespace FactionColors
         internal static ConfigEntry<bool> cfgOnlyIfThreePlusFactions;
         internal static ConfigEntry<bool> cfgPatchMapIcons;
         internal static ConfigEntry<bool> cfgPatchHUDMarkers;
+
+        // Cached scene FactionHQ count. Refreshed lazily every few seconds and
+        // also resets to 0 on scene load (Time.timeSinceLevelLoad restarts), so
+        // we don't have to wire scene-change events.
+        private static float _lastHQRefresh = -10f;
+        private static int _sceneHQCount;
 
         void Awake()
         {
@@ -35,7 +41,7 @@ namespace FactionColors
             {
                 var harmony = new Harmony("com.noms.factioncolors");
                 harmony.PatchAll();
-                Logger.LogInfo($"Faction Colors v1.0.0 patched {harmony.GetPatchedMethods().Count()} methods");
+                Logger.LogInfo($"Faction Colors v1.0.1 patched {harmony.GetPatchedMethods().Count()} methods");
             }
             catch (Exception e)
             {
@@ -45,6 +51,20 @@ namespace FactionColors
 
         // === Helpers ===
 
+        internal static int GetSceneFactionHQCount()
+        {
+            // Counts actual FactionHQ network behaviours in the scene rather than
+            // reading FactionRegistry.HQLookup, because the ThirdFaction mod
+            // intentionally removes its injected HQ from HQLookup (to keep the
+            // join menu safe) — the HQ object still exists and units still point
+            // at it, but a HQLookup-based count would falsely report 2 factions.
+            if (Time.timeSinceLevelLoad - _lastHQRefresh < 3f) return _sceneHQCount;
+            _lastHQRefresh = Time.timeSinceLevelLoad;
+            try { _sceneHQCount = UnityEngine.Object.FindObjectsOfType<FactionHQ>().Length; }
+            catch { _sceneHQCount = 0; }
+            return _sceneHQCount;
+        }
+
         internal static bool ShouldOverride(FactionHQ hq)
         {
             if (!cfgEnabled.Value) return false;
@@ -53,7 +73,7 @@ namespace FactionColors
             // Friendly and spectator-mode coloring is untouched.
             if (DynamicMap.GetFactionMode(hq, checkNoFactionBeforeSpectator: true) != FactionMode.Enemy)
                 return false;
-            if (cfgOnlyIfThreePlusFactions.Value && FactionRegistry.HQLookup.Count < 3)
+            if (cfgOnlyIfThreePlusFactions.Value && GetSceneFactionHQCount() < 3)
                 return false;
             if (hq.faction == null) return false;
             return true;
